@@ -5,7 +5,6 @@
 package tls
 
 import (
-	"crypto"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/sha1"
@@ -270,22 +269,4 @@ func (h finishedHash) serverSum(masterSecret []byte) []byte {
 		prf10(out, masterSecret, serverFinishedLabel, seed)
 	}
 	return out
-}
-
-// hashForClientCertificate returns a digest, hash function, and TLS 1.2 hash
-// id suitable for signing by a TLS client certificate.
-func (h finishedHash) hashForClientCertificate(sigType uint8) ([]byte, crypto.Hash, uint8) {
-	if h.version >= VersionTLS12 {
-		digest := h.server.Sum(nil)
-		return digest, crypto.SHA256, hashSHA256
-	}
-	if sigType == signatureECDSA {
-		digest := h.server.Sum(nil)
-		return digest, crypto.SHA1, hashSHA1
-	}
-
-	digest := make([]byte, 0, 36)
-	digest = h.serverMD5.Sum(digest)
-	digest = h.server.Sum(digest)
-	return digest, crypto.MD5SHA1, 0 /* not specified in TLS 1.2. */
 }

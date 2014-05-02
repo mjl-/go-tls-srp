@@ -10,7 +10,6 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"crypto/subtle"
-	"crypto/x509"
 	"errors"
 	"io"
 	"net"
@@ -33,16 +32,8 @@ type Conn struct {
 	handshakeComplete bool
 	didResume         bool // whether this connection was a session resumption
 	cipherSuite       uint16
-	ocspResponse      []byte // stapled OCSP response
-	peerCertificates  []*x509.Certificate
-	// verifiedChains contains the certificate chains that we built, as
-	// opposed to the ones presented by the server.
-	verifiedChains [][]*x509.Certificate
 	// serverName contains the server name indicated by the client, if any.
 	serverName string
-
-	clientProtocol         string
-	clientProtocolFallback bool
 
 	// first permanent error
 	connErr
@@ -54,6 +45,8 @@ type Conn struct {
 	hand     bytes.Buffer // handshake data waiting to be read
 
 	tmp [16]byte
+
+	srpUser string
 }
 
 type connErr struct {
@@ -799,26 +792,12 @@ func (c *Conn) readHandshake() (interface{}, error) {
 		m = new(clientHelloMsg)
 	case typeServerHello:
 		m = new(serverHelloMsg)
-	case typeCertificate:
-		m = new(certificateMsg)
-	case typeCertificateRequest:
-		m = &certificateRequestMsg{
-			hasSignatureAndHash: c.vers >= VersionTLS12,
-		}
-	case typeCertificateStatus:
-		m = new(certificateStatusMsg)
 	case typeServerKeyExchange:
 		m = new(serverKeyExchangeMsg)
 	case typeServerHelloDone:
 		m = new(serverHelloDoneMsg)
 	case typeClientKeyExchange:
 		m = new(clientKeyExchangeMsg)
-	case typeCertificateVerify:
-		m = &certificateVerifyMsg{
-			hasSignatureAndHash: c.vers >= VersionTLS12,
-		}
-	case typeNextProtocol:
-		m = new(nextProtoMsg)
 	case typeFinished:
 		m = new(finishedMsg)
 	default:
@@ -960,38 +939,10 @@ func (c *Conn) ConnectionState() ConnectionState {
 	var state ConnectionState
 	state.HandshakeComplete = c.handshakeComplete
 	if c.handshakeComplete {
-		state.NegotiatedProtocol = c.clientProtocol
-		state.DidResume = c.didResume
-		state.NegotiatedProtocolIsMutual = !c.clientProtocolFallback
 		state.CipherSuite = c.cipherSuite
-		state.PeerCertificates = c.peerCertificates
-		state.VerifiedChains = c.verifiedChains
 		state.ServerName = c.serverName
+		state.SRPUser = c.srpUser
 	}
 
 	return state
-}
-
-// OCSPResponse returns the stapled OCSP response from the TLS server, if
-// any. (Only valid for client connections.)
-func (c *Conn) OCSPResponse() []byte {
-	c.handshakeMutex.Lock()
-	defer c.handshakeMutex.Unlock()
-
-	return c.ocspResponse
-}
-
-// VerifyHostname checks that the peer certificate chain is valid for
-// connecting to host.  If so, it returns nil; if not, it returns an error
-// describing the problem.
-func (c *Conn) VerifyHostname(host string) error {
-	c.handshakeMutex.Lock()
-	defer c.handshakeMutex.Unlock()
-	if !c.isClient {
-		return errors.New("VerifyHostname called on TLS server connection")
-	}
-	if !c.handshakeComplete {
-		return errors.New("TLS handshake has not yet been performed")
-	}
-	return c.peerCertificates[0].VerifyHostname(host)
 }

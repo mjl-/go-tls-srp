@@ -21,7 +21,7 @@ type sessionState struct {
 	vers         uint16
 	cipherSuite  uint16
 	masterSecret []byte
-	certificates [][]byte
+	srpUser      []byte
 }
 
 func (s *sessionState) equal(i interface{}) bool {
@@ -36,24 +36,15 @@ func (s *sessionState) equal(i interface{}) bool {
 		return false
 	}
 
-	if len(s.certificates) != len(s1.certificates) {
+	if !bytes.Equal(s.srpUser, s1.srpUser) {
 		return false
-	}
-
-	for i := range s.certificates {
-		if !bytes.Equal(s.certificates[i], s1.certificates[i]) {
-			return false
-		}
 	}
 
 	return true
 }
 
 func (s *sessionState) marshal() []byte {
-	length := 2 + 2 + 2 + len(s.masterSecret) + 2
-	for _, cert := range s.certificates {
-		length += 4 + len(cert)
-	}
+	length := 2 + 2 + 2 + len(s.masterSecret) + 1 + len(s.srpUser)
 
 	ret := make([]byte, length)
 	x := ret
@@ -67,18 +58,8 @@ func (s *sessionState) marshal() []byte {
 	copy(x, s.masterSecret)
 	x = x[len(s.masterSecret):]
 
-	x[0] = byte(len(s.certificates) >> 8)
-	x[1] = byte(len(s.certificates))
-	x = x[2:]
-
-	for _, cert := range s.certificates {
-		x[0] = byte(len(cert) >> 24)
-		x[1] = byte(len(cert) >> 16)
-		x[2] = byte(len(cert) >> 8)
-		x[3] = byte(len(cert))
-		copy(x[4:], cert)
-		x = x[4+len(cert):]
-	}
+	x[0] = byte(len(s.srpUser))
+	copy(x[1:], s.srpUser)
 
 	return ret
 }
@@ -99,33 +80,14 @@ func (s *sessionState) unmarshal(data []byte) bool {
 	s.masterSecret = data[:masterSecretLen]
 	data = data[masterSecretLen:]
 
-	if len(data) < 2 {
+	if len(data) < 1 {
 		return false
 	}
-
-	numCerts := int(data[0])<<8 | int(data[1])
-	data = data[2:]
-
-	s.certificates = make([][]byte, numCerts)
-	for i := range s.certificates {
-		if len(data) < 4 {
-			return false
-		}
-		certLen := int(data[0])<<24 | int(data[1])<<16 | int(data[2])<<8 | int(data[3])
-		data = data[4:]
-		if certLen < 0 {
-			return false
-		}
-		if len(data) < certLen {
-			return false
-		}
-		s.certificates[i] = data[:certLen]
-		data = data[certLen:]
-	}
-
-	if len(data) > 0 {
+	length := int(data[0])
+	if len(data) != 1+length {
 		return false
 	}
+	s.srpUser = data[1:]
 
 	return true
 }

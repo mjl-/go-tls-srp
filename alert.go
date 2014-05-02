@@ -37,6 +37,7 @@ const (
 	alertInternalError          alert = 80
 	alertUserCanceled           alert = 90
 	alertNoRenegotiation        alert = 100
+	alertUnknownPskIdentity     alert = 115
 )
 
 var alertText = map[alert]string{
@@ -62,6 +63,7 @@ var alertText = map[alert]string{
 	alertInternalError:          "internal error",
 	alertUserCanceled:           "user canceled",
 	alertNoRenegotiation:        "no renegotiation",
+	alertUnknownPskIdentity:     "unknown psk identity",
 }
 
 func (e alert) String() string {
