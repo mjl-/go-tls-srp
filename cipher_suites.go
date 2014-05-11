@@ -62,13 +62,12 @@ type cipherSuite struct {
 	flags  int
 	cipher func(key, iv []byte, isRead bool) interface{}
 	mac    func(version uint16, macKey []byte) macFunction
-	aead   func(key, fixedNonce []byte) cipher.AEAD
 }
 
 var cipherSuites = []*cipherSuite{
-	{TLS_SRP_SHA_WITH_AES_256_CBC_SHA, 32, 20, 16, srpKA, 0, cipherAES, macSHA1, nil},
-	{TLS_SRP_SHA_WITH_AES_128_CBC_SHA, 16, 20, 16, srpKA, 0, cipherAES, macSHA1, nil},
-	{TLS_SRP_SHA_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, srpKA, 0, cipher3DES, macSHA1, nil},
+	{TLS_SRP_SHA_WITH_AES_256_CBC_SHA, 32, 20, 16, srpKA, 0, cipherAES, macSHA1},
+	{TLS_SRP_SHA_WITH_AES_128_CBC_SHA, 16, 20, 16, srpKA, 0, cipherAES, macSHA1},
+	{TLS_SRP_SHA_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, srpKA, 0, cipher3DES, macSHA1},
 }
 
 func cipher3DES(key, iv []byte, isRead bool) interface{} {

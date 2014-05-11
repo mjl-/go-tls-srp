@@ -251,26 +251,6 @@ func (hc *halfConn) decrypt(b *block) (ok bool, prefixLen int, alertValue alert)
 		switch c := hc.cipher.(type) {
 		case cipher.Stream:
 			c.XORKeyStream(payload, payload)
-		case cipher.AEAD:
-			explicitIVLen = 8
-			if len(payload) < explicitIVLen {
-				return false, 0, alertBadRecordMAC
-			}
-			nonce := payload[:8]
-			payload = payload[8:]
-
-			var additionalData [13]byte
-			copy(additionalData[:], hc.seq[:])
-			copy(additionalData[8:], b.data[:3])
-			n := len(payload) - c.Overhead()
-			additionalData[11] = byte(n >> 8)
-			additionalData[12] = byte(n)
-			var err error
-			payload, err = c.Open(payload[:0], nonce, payload, additionalData[:])
-			if err != nil {
-				return false, 0, alertBadRecordMAC
-			}
-			b.resize(recordHeaderLen + explicitIVLen + len(payload))
 		case cbcMode:
 			blockSize := c.BlockSize()
 			if hc.version >= VersionTLS11 {
@@ -368,20 +348,6 @@ func (hc *halfConn) encrypt(b *block, explicitIVLen int) (bool, alert) {
 		switch c := hc.cipher.(type) {
 		case cipher.Stream:
 			c.XORKeyStream(payload, payload)
-		case cipher.AEAD:
-			payloadLen := len(b.data) - recordHeaderLen - explicitIVLen
-			b.resize(len(b.data) + c.Overhead())
-			nonce := b.data[recordHeaderLen : recordHeaderLen+explicitIVLen]
-			payload := b.data[recordHeaderLen+explicitIVLen:]
-			payload = payload[:payloadLen]
-
-			var additionalData [13]byte
-			copy(additionalData[:], hc.seq[:])
-			copy(additionalData[8:], b.data[:3])
-			additionalData[11] = byte(payloadLen >> 8)
-			additionalData[12] = byte(payloadLen)
-
-			c.Seal(payload[:0], nonce, payload, additionalData[:])
 		case cbcMode:
 			blockSize := c.BlockSize()
 			if explicitIVLen > 0 {
@@ -697,18 +663,6 @@ func (c *Conn) writeRecord(typ recordType, data []byte) (n int, err error) {
 			var ok bool
 			if cbc, ok = c.out.cipher.(cbcMode); ok {
 				explicitIVLen = cbc.BlockSize()
-			}
-		}
-		if explicitIVLen == 0 {
-			if _, ok := c.out.cipher.(cipher.AEAD); ok {
-				explicitIVLen = 8
-				// The AES-GCM construction in TLS has an
-				// explicit nonce so that the nonce can be
-				// random. However, the nonce is only 8 bytes
-				// which is too small for a secure, random
-				// nonce. Therefore we use the sequence number
-				// as the nonce.
-				explicitIVIsSeq = true
 			}
 		}
 		b.resize(recordHeaderLen + explicitIVLen + m)

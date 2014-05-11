@@ -293,15 +293,10 @@ func (hs *serverHandshakeState) establishKeys() error {
 	var clientCipher, serverCipher interface{}
 	var clientHash, serverHash macFunction
 
-	if hs.suite.aead == nil {
-		clientCipher = hs.suite.cipher(clientKey, clientIV, true /* for reading */)
-		clientHash = hs.suite.mac(c.vers, clientMAC)
-		serverCipher = hs.suite.cipher(serverKey, serverIV, false /* not for reading */)
-		serverHash = hs.suite.mac(c.vers, serverMAC)
-	} else {
-		clientCipher = hs.suite.aead(clientKey, clientIV)
-		serverCipher = hs.suite.aead(serverKey, serverIV)
-	}
+	clientCipher = hs.suite.cipher(clientKey, clientIV, true /* for reading */)
+	clientHash = hs.suite.mac(c.vers, clientMAC)
+	serverCipher = hs.suite.cipher(serverKey, serverIV, false /* not for reading */)
+	serverHash = hs.suite.mac(c.vers, serverMAC)
 
 	c.in.prepareCipherSpec(c.vers, clientCipher, clientHash)
 	c.out.prepareCipherSpec(c.vers, serverCipher, serverHash)

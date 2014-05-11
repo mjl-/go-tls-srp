@@ -132,12 +132,8 @@ NextCipherSuite:
 
 	var clientCipher interface{}
 	var clientHash macFunction
-	if suite.cipher != nil {
-		clientCipher = suite.cipher(clientKey, clientIV, false /* not for reading */)
-		clientHash = suite.mac(c.vers, clientMAC)
-	} else {
-		clientCipher = suite.aead(clientKey, clientIV)
-	}
+	clientCipher = suite.cipher(clientKey, clientIV, false /* not for reading */)
+	clientHash = suite.mac(c.vers, clientMAC)
 	c.out.prepareCipherSpec(c.vers, clientCipher, clientHash)
 	c.writeRecord(recordTypeChangeCipherSpec, []byte{1})
 
@@ -148,12 +144,8 @@ NextCipherSuite:
 
 	var serverCipher interface{}
 	var serverHash macFunction
-	if suite.cipher != nil {
-		serverCipher = suite.cipher(serverKey, serverIV, true /* for reading */)
-		serverHash = suite.mac(c.vers, serverMAC)
-	} else {
-		serverCipher = suite.aead(serverKey, serverIV)
-	}
+	serverCipher = suite.cipher(serverKey, serverIV, true /* for reading */)
+	serverHash = suite.mac(c.vers, serverMAC)
 	c.in.prepareCipherSpec(c.vers, serverCipher, serverHash)
 	c.readRecord(recordTypeChangeCipherSpec)
 	if err := c.error(); err != nil {
